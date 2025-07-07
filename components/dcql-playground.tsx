@@ -5,13 +5,16 @@ import { DcqlQuery } from "dcql"
 import { Editor } from "@monaco-editor/react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Sun, Moon, Check, ChevronsUpDown, Eye, Code, CheckCircle, XCircle } from "lucide-react"
+import { AlertCircle, Sun, Moon, Check, ChevronsUpDown, Eye, Code, CheckCircle, XCircle, Trash2, Plus, Settings } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
+import { Label } from "./ui/label"
+import { Switch } from "./ui/switch"
 
 /* ------------------------------------------------------------------ */
 /*  SAMPLE DATA                                                       */
@@ -67,7 +70,7 @@ const SAMPLE_QUERIES = [
         { path: ["first_name"], intent_to_retain: true },
         { path: ["address", "street_address"], intent_to_retain: false },
       ],
-      require_cryptographic_holder_binding: false,
+      require_cryptographic_holder_binding: true,
     },
   },
   {
@@ -89,7 +92,7 @@ const SAMPLE_QUERIES = [
         { path: ["first_name"], intent_to_retain: true },
         { path: ["address", "street_address"], intent_to_retain: false },
       ],
-      require_cryptographic_holder_binding: false,
+      require_cryptographic_holder_binding: true,
     },
   },
 ]
@@ -137,7 +140,7 @@ const SAMPLE_CREDENTIALS = [
         type: "openid_federation",
         value: "https://federation.com",
       },
-      cryptographic_holder_binding: false,
+      cryptographic_holder_binding: true,
     },
   },
   {
@@ -165,7 +168,7 @@ const SAMPLE_CREDENTIALS = [
         ],
         nationalities: ["British", "Betelgeusian"],
       },
-      cryptographic_holder_binding: false,
+      cryptographic_holder_binding: true,
     },
   },
   {
@@ -197,10 +200,18 @@ const SAMPLE_CREDENTIALS = [
         ],
         nationalities: ["British", "Betelgeusian"],
       },
-      cryptographic_holder_binding: false,
+      cryptographic_holder_binding: true,
     },
   },
 ]
+
+/* ------------------------------------------------------------------ */
+/*  TYPES                                                             */
+/* ------------------------------------------------------------------ */
+interface CredentialSet {
+  options: string[][]
+  required: boolean
+}
 
 /* ------------------------------------------------------------------ */
 /*  SMALL UTILS                                                       */
@@ -213,6 +224,214 @@ function useDebounce<T extends (...a: any) => any>(fn: T, delay = 800) {
       timer.current = setTimeout(() => fn(...args), delay)
     },
     [fn, delay],
+  )
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  CREDENTIAL SET BUILDER COMPONENTS                                 */
+/* ------------------------------------------------------------------ */
+interface CredentialSetBuilderProps {
+  credentialSets: CredentialSet[]
+  onCredentialSetsChange: (sets: CredentialSet[]) => void
+  availableCredentialIds: string[]
+}
+
+function CredentialSetBuilder({
+  credentialSets,
+  onCredentialSetsChange,
+  availableCredentialIds,
+}: CredentialSetBuilderProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [editingSets, setEditingSets] = useState<CredentialSet[]>(credentialSets)
+
+  useEffect(() => {
+    setEditingSets(credentialSets)
+  }, [credentialSets])
+
+  const handleSave = () => {
+    onCredentialSetsChange(editingSets)
+    setIsOpen(false)
+  }
+
+  const addCredentialSet = () => {
+    setEditingSets([...editingSets, { options: [[]], required: true }])
+  }
+
+  const removeCredentialSet = (setIndex: number) => {
+    setEditingSets(editingSets.filter((_, index) => index !== setIndex))
+  }
+
+  const updateCredentialSet = (setIndex: number, updates: Partial<CredentialSet>) => {
+    setEditingSets(editingSets.map((set, index) => (index === setIndex ? { ...set, ...updates } : set)))
+  }
+
+  const addOption = (setIndex: number) => {
+    const newSets = [...editingSets]
+    newSets[setIndex].options.push([])
+    setEditingSets(newSets)
+  }
+
+  const removeOption = (setIndex: number, optionIndex: number) => {
+    const newSets = [...editingSets]
+    newSets[setIndex].options = newSets[setIndex].options.filter((_, index) => index !== optionIndex)
+    setEditingSets(newSets)
+  }
+
+  const updateOption = (setIndex: number, optionIndex: number, credentialIds: string[]) => {
+    const newSets = [...editingSets]
+    newSets[setIndex].options[optionIndex] = credentialIds
+    setEditingSets(newSets)
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="h-6 px-2 bg-transparent">
+          <Settings className="h-3 w-3 mr-1" />
+          Credential Sets
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Configure Credential Sets</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {editingSets.map((credentialSet, setIndex) => (
+            <Card key={setIndex} className="border-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-sm">
+                  <span>Credential Set {setIndex + 1}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`required-${setIndex}`}
+                        checked={credentialSet.required}
+                        onCheckedChange={(checked) => updateCredentialSet(setIndex, { required: checked })}
+                      />
+                      <Label htmlFor={`required-${setIndex}`} className="text-xs">
+                        Required
+                      </Label>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeCredentialSet(setIndex)}
+                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {credentialSet.options.map((option, optionIndex) => (
+                  <div key={optionIndex} className="border rounded-md p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium">Option {optionIndex + 1}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeOption(setIndex, optionIndex)}
+                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <CredentialIdMultiSelect
+                      selectedIds={option}
+                      availableIds={availableCredentialIds}
+                      onSelectionChange={(ids) => updateOption(setIndex, optionIndex, ids)}
+                    />
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={() => addOption(setIndex)} className="w-full">
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Option
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={addCredentialSet} className="flex-1 bg-transparent">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Credential Set
+            </Button>
+          </div>
+
+          <div className="flex gap-2 pt-4 border-t">
+            <Button onClick={handleSave} className="flex-1">
+              Apply Changes
+            </Button>
+            <Button variant="outline" onClick={() => setIsOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface CredentialIdMultiSelectProps {
+  selectedIds: string[]
+  availableIds: string[]
+  onSelectionChange: (ids: string[]) => void
+}
+
+function CredentialIdMultiSelect({ selectedIds, availableIds, onSelectionChange }: CredentialIdMultiSelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const handleToggle = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onSelectionChange(selectedIds.filter((selectedId) => selectedId !== id))
+    } else {
+      onSelectionChange([...selectedIds, id])
+    }
+  }
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={isOpen}
+          className="w-full justify-between h-auto min-h-8 text-xs bg-transparent"
+        >
+          <div className="flex flex-wrap gap-1">
+            {selectedIds.length === 0 ? (
+              <span className="text-muted-foreground">Select credential IDs...</span>
+            ) : (
+              selectedIds.map((id) => (
+                <Badge key={id} variant="outline" className="text-xs">
+                  {id}
+                </Badge>
+              ))
+            )}
+          </div>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0">
+        <Command>
+          <CommandInput placeholder="Search credential IDs..." className="h-9" />
+          <CommandList>
+            <CommandEmpty>No credential IDs found.</CommandEmpty>
+            <CommandGroup>
+              {availableIds.map((id) => (
+                <CommandItem key={id} value={id} onSelect={() => handleToggle(id)}>
+                  <Check className={`mr-2 h-4 w-4 ${selectedIds.includes(id) ? "opacity-100" : "opacity-0"}`} />
+                  <span className="text-xs">{id}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -251,6 +470,30 @@ function ResultsVisualization({ data }: VisualizationProps) {
           </Badge>
         </CardContent>
       </Card>
+
+      {/* Credential Sets */}
+      {data.credential_sets && data.credential_sets.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CheckCircle className="h-5 w-5 text-blue-500" />
+              Credential Sets ({data.credential_sets.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {data.credential_sets.map((credentialSet: any, index: number) => (
+                <CredentialSetCard
+                  key={index}
+                  credentialSet={credentialSet}
+                  setIndex={index}
+                  credentialMatches={credentialMatches}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Credential Matches */}
       <div className="space-y-3">
@@ -684,6 +927,122 @@ function ClaimsDetailView({ claimsData }: { claimsData: any }) {
   )
 }
 
+function CredentialSetCard({
+  credentialSet,
+  setIndex,
+  credentialMatches,
+}: { credentialSet: any; setIndex: number; credentialMatches: any }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const isRequired = credentialSet.required
+  const options = credentialSet.options || []
+  const matchingOptions = credentialSet.matching_options || []
+  const hasMatches = matchingOptions.length > 0
+
+  // Get all available credential IDs from credential matches
+  const availableCredentialIds = Object.keys(credentialMatches)
+
+  return (
+    <Card
+      className="border-l-4"
+      style={{ borderLeftColor: hasMatches ? "#22c55e" : isRequired ? "#ef4444" : "#f59e0b" }}
+    >
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3">
+            <CardTitle className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                {hasMatches ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : isRequired ? (
+                  <XCircle className="h-4 w-4 text-red-500" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-yellow-500" />
+                )}
+                <span>Credential Set {setIndex}</span>
+                <Badge variant={isRequired ? "default" : "secondary"} className="text-xs">
+                  {isRequired ? "Required" : "Optional"}
+                </Badge>
+                <Badge variant={hasMatches ? "default" : "destructive"} className="text-xs">
+                  {hasMatches ? `${matchingOptions.length} Matching` : "No Matches"}
+                </Badge>
+              </div>
+            </CardTitle>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0 space-y-4">
+            {/* Available Options */}
+            <div className="space-y-2">
+              {options.map((option: string[], optionIndex: number) => {
+                const isMatching = matchingOptions.some(
+                  (matchingOption: string[]) => JSON.stringify(matchingOption.sort()) === JSON.stringify(option.sort()),
+                )
+
+                return (
+                  <div
+                    key={optionIndex}
+                    className={`border rounded-md p-3 ${
+                      isMatching ? "border-green-500 bg-green-50/50 dark:bg-green-950/20" : "border-muted bg-muted/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      {isMatching ? (
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <XCircle className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <span className="text-xs font-medium">
+                        Option {optionIndex + 1} {isMatching && "(Matching)"}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {option.map((credentialId: string, credIndex: number) => {
+                        // Check if this specific credential ID has a successful match
+                        const credentialHasMatch = credentialMatches[credentialId]?.success || false
+
+                        return (
+                          <Badge
+                            key={credIndex}
+                            variant="secondary"
+                            className={`text-xs ${
+                              credentialHasMatch
+                                ? "border-green-200 text-green-800 bg-green-50 dark:border-green-800 dark:text-green-200 dark:bg-green-950/20"
+                                : "border-red-200 text-red-800 bg-red-50 dark:border-red-800 dark:text-red-200 dark:bg-red-950/20"
+                            }`}
+                          >
+                            {credentialHasMatch ? (
+                              <CheckCircle className="h-2 w-2 mr-1 text-green-700 dark:text-green-300" />
+                            ) : (
+                              <XCircle className="h-2 w-2 mr-1 text-red-700 dark:text-red-300" />
+                            )}
+                            {credentialId}
+                          </Badge>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* No Matches Message */}
+            {matchingOptions.length === 0 && (
+              <div className="text-center py-4">
+                <XCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  {isRequired
+                    ? "This required credential set has no matching options"
+                    : "This optional credential set has no matching options"}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  )
+}
+
 /* ------------------------------------------------------------------ */
 /*  MAIN COMPONENT                                                    */
 /* ------------------------------------------------------------------ */
@@ -691,6 +1050,7 @@ export function DCQLPlayground() {
   const { theme, setTheme } = useTheme()
   const [selectedQueryIndices, setSelectedQueryIndices] = useState<number[]>([0])
   const [selectedCredentialIndices, setSelectedCredentialIndices] = useState<number[]>([0, 1, 2, 3]) // All pre-selected
+  const [credentialSets, setCredentialSets] = useState<CredentialSet[]>([])
   const [query, setQuery] = useState("")
   const [creds, setCreds] = useState("")
   const [result, setResult] = useState("[]")
@@ -703,15 +1063,23 @@ export function DCQLPlayground() {
 
   useEffect(() => setMounted(true), [])
 
+    // Get available credential IDs from selected queries
+  const availableCredentialIds = selectedQueryIndices.map((index) => SAMPLE_QUERIES[index].query.id)
+
   // Generate combined query from selected indices
-  const generateCombinedQuery = useCallback((indices: number[]) => {
+  const generateCombinedQuery = useCallback((indices: number[], sets: CredentialSet[]) => {
     if (indices.length === 0) {
       return JSON.stringify({ credentials: [] }, null, 2)
     }
 
     const selectedCredentials = indices.map((index) => SAMPLE_QUERIES[index].query)
-    const combinedQuery = {
+    const combinedQuery: any = {
       credentials: selectedCredentials,
+    }
+
+    // Add credential sets if any exist
+    if (sets.length > 0) {
+      combinedQuery.credential_sets = sets
     }
 
     return JSON.stringify(combinedQuery, null, 2)
@@ -729,9 +1097,9 @@ export function DCQLPlayground() {
 
   // Update query when selection changes
   useEffect(() => {
-    const newQuery = generateCombinedQuery(selectedQueryIndices)
+    const newQuery = generateCombinedQuery(selectedQueryIndices, credentialSets)
     setQuery(newQuery)
-  }, [selectedQueryIndices, generateCombinedQuery])
+  }, [selectedQueryIndices, credentialSets, generateCombinedQuery])
 
   // Update credentials when selection changes
   useEffect(() => {
@@ -747,7 +1115,7 @@ export function DCQLPlayground() {
       if (!Array.isArray(cArr)) throw new Error("Credentials must be an array")
       const parsed = DcqlQuery.parse(qObj)
       DcqlQuery.validate(parsed)
-      const res = DcqlQuery.query(parsed, cArr)
+      const {credentials, ...res} = DcqlQuery.query(parsed, cArr)
       setResult(JSON.stringify(res, null, 2))
       setResultData(res)
       setError(null)
@@ -790,11 +1158,13 @@ export function DCQLPlayground() {
 
   const resetQueryToDefault = () => {
     setSelectedQueryIndices([0])
+    setCredentialSets([])
   }
 
   const resetCredentialsToDefault = () => {
     setSelectedCredentialIndices([0, 1, 2, 3])
   }
+
 
   /* --------------------  RENDER ---------------------------------- */
   return (
@@ -883,14 +1253,21 @@ export function DCQLPlayground() {
         {/* ─── Left column ─── */}
         <section className="flex flex-col min-h-0">
           {/* two stacked editors */}
-          <div className="grid min-h-0 flex-1 grid-rows-2 gap-2">
+          <div className="grid flex-1 grid-rows-2 gap-2 min-h-[600px]">
             {/* Query editor with multi-select */}
             <div className="flex min-h-0 flex-col overflow-hidden rounded-md border bg-card">
               <header className="flex items-center justify-between border-b px-3 py-2">
                 <h2 className="text-sm font-medium">DCQL Query</h2>
-                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={resetQueryToDefault}>
-                  Reset
-                </Button>
+                <div className="flex gap-2">
+                  <CredentialSetBuilder
+                    credentialSets={credentialSets}
+                    onCredentialSetsChange={setCredentialSets}
+                    availableCredentialIds={availableCredentialIds}
+                  />
+                  <Button variant="ghost" size="sm" className="h-6 px-2" onClick={resetQueryToDefault}>
+                    Reset
+                  </Button>
+                </div>
               </header>
 
               {/* Query multi-select */}
@@ -1041,7 +1418,7 @@ export function DCQLPlayground() {
         {/* ─── Right column ─── */}
         <section className="flex flex-col min-h-0">
           <div className="mb-1" /> {/* spacer for alignment */}
-          <div className="flex min-h-0 flex-1 overflow-hidden rounded-md border bg-card">
+          <div className="flex min-h-[600px] flex-1 overflow-hidden rounded-md border bg-card">
             <div className="flex w-full flex-col">
               <header className="flex items-center justify-between border-b px-3 py-2">
                 <h2 className="text-sm font-medium">Results</h2>
