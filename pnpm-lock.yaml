@@ -111,8 +111,8 @@ importers:
         specifier: 4.1.0
         version: 4.1.0
       dcql:
-        specifier: 0.4.1-alpha-20250706141347
-        version: 0.4.1-alpha-20250706141347(typescript@5.0.2)
+        specifier: 0.4.2
+        version: 0.4.2(typescript@5.0.2)
       embla-carousel-react:
         specifier: 8.5.1
         version: 8.5.1(react@19.0.0)
@@ -1278,8 +1278,8 @@ packages:
   date-fns@4.1.0:
     resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
 
-  dcql@0.4.1-alpha-20250706141347:
-    resolution: {integrity: sha512-rCtP5SAAvN91SY7x6ioxKtNhQZSgX30MWi4f83STsJ22kwVTsGTRh0ovUsYlHrgvq1mNgGSV0KUh/g0NwF1tPA==}
+  dcql@0.4.2:
+    resolution: {integrity: sha512-vp7/Z97pBMIxI5zEnuYlztdTC/JCxzHVZun0a7+al2zaw3caZNgPUvdesdpmrLkDmAD6CosiipkpUs+DGKRS8g==}
 
   decimal.js-light@2.5.1:
     resolution: {integrity: sha512-qIMFpTMZmny+MMIitAB6D7iVPEorVw6YQRWkvarTkT4tBeSLLiHzcwj6q0MmYSFCiVpiqPJTJEYIrpcPzVEIvg==}
@@ -2984,7 +2984,7 @@ snapshots:
 
   date-fns@4.1.0: {}
 
-  dcql@0.4.1-alpha-20250706141347(typescript@5.0.2):
+  dcql@0.4.2(typescript@5.0.2):
     dependencies:
       valibot: 1.0.0-beta.8(typescript@5.0.2)
     transitivePeerDependencies:
