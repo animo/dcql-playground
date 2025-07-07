@@ -872,7 +872,7 @@ export function DCQLPlayground() {
               </a>
             </div>
             <span className="text-muted-foreground/70">
-              Built by <strong>Animo</strong> • Powered by the OpenWallet Foundation
+              Built by <strong>Animo</strong>
             </span>
           </div>
         </div>

@@ -1,30 +1,53 @@
-# Dcql playground setup
+<p align="center">
+  <picture>
+   <source media="(prefers-color-scheme: light)" srcset="https://res.cloudinary.com/animo-solutions/image/upload/v1656578320/animo-logo-light-no-text_ok9auy.svg">
+   <source media="(prefers-color-scheme: dark)" srcset="https://res.cloudinary.com/animo-solutions/image/upload/v1656578320/animo-logo-dark-no-text_fqqdq9.svg">
+   <img alt="Animo Logo" height="200px" />
+  </picture>
+</p>
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+<h1 align="center" ><b>DCQL Playground</b></h1>
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/timo-glastras-projects/v0-dcql-playground-setup)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/WBzPvX9KODe)
+<h4 align="center">Powered by &nbsp; 
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="https://res.cloudinary.com/animo-solutions/image/upload/v1656579715/animo-logo-light-text_cma2yo.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="https://res.cloudinary.com/animo-solutions/image/upload/v1656579715/animo-logo-dark-text_uccvqa.svg">
+    <img alt="Animo Logo" height="12px" />
+  </picture>
+</h4><br>
 
-## Overview
+<p align="center">
+  <a href="https://typescriptlang.org">
+    <img src="https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg" />
+  </a>
+  <a
+    href="https://raw.githubusercontent.com/animo/dcql-playground/main/LICENSE"
+    ><img
+      alt="License"
+      src="https://img.shields.io/badge/License-EUPL%201.2-blue.svg"
+  /></a>
+</p>
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+<p align="center">
+  <a href="#getting-started">Getting started</a> 
+  &nbsp;|&nbsp;
+  <a href="#contributing">Contributing</a> 
+  &nbsp;|&nbsp;
+  <a href="#contributing">License</a> 
+</p>
 
-## Deployment
+---
 
-Your project is live at:
+DCQL (Digital Credentials Query Language) is a query language for requesting specific claims from digital credentials. Test your DCQL queries against various credential formats including mDOC, SD-JWT VC, and W3C VC.
 
-**[https://vercel.com/timo-glastras-projects/v0-dcql-playground-setup](https://vercel.com/timo-glastras-projects/v0-dcql-playground-setup)**
+- [▶️ DCQL Playground](https://dcql.animo.id)
+- [📋 DCQL Specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-digital-credentials-query-l)
+- [🔗 Open Source Library](https://github.com/openwallet-foundation-labs/dcql-ts)
 
-## Build your app
+## Contributing
 
-Continue building your app on:
+Is there something you'd like to fix or add? Great, we love community contributions!
 
-**[https://v0.dev/chat/projects/WBzPvX9KODe](https://v0.dev/chat/projects/WBzPvX9KODe)**
+## License
 
-## How It Works
-
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+Animo's DCQL Playground is licensed under the [Apache 2.0](./LICENSE) license.
