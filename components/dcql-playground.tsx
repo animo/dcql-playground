@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { DcqlQuery } from "dcql@0.4.1-alpha-20250706141347"
+import { DcqlQuery } from "dcql"
 import { Editor } from "@monaco-editor/react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
