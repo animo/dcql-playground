@@ -1,30 +1,64 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import { DcqlQuery } from "dcql"
-import { Editor } from "@monaco-editor/react"
-import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Sun, Moon, Check, ChevronsUpDown, Eye, Code, CheckCircle, XCircle, Trash2, Plus, Settings } from "lucide-react"
-import { useTheme } from "next-themes"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
-import { Label } from "./ui/label"
-import { Switch } from "./ui/switch"
+import { useState, useEffect, useRef, useCallback } from "react";
+import { DcqlCredential, DcqlQuery } from "dcql";
+import { Editor } from "@monaco-editor/react";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertCircle,
+  Sun,
+  Moon,
+  Check,
+  ChevronsUpDown,
+  Eye,
+  Code,
+  CheckCircle,
+  XCircle,
+  Trash2,
+  Plus,
+  Settings,
+} from "lucide-react";
+import { useTheme } from "next-themes";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
+import { Label } from "./ui/label";
+import { Switch } from "./ui/switch";
 
 /* ------------------------------------------------------------------ */
 /*  SAMPLE DATA                                                       */
 /* ------------------------------------------------------------------ */
 const SAMPLE_QUERIES = [
   {
-    name: "Basic mVRC Query (mDOC)",
+    name: "Mobile Vehicle Registration Certificate (mVRC) - mDOC",
     query: {
-      id: "mvrc_credential",
-      format: "mso_mdoc" as const,
+      id: "mvrc",
+      format: "mso_mdoc",
       meta: { doctype_value: "org.iso.7367.1.mVRC" },
       require_cryptographic_holder_binding: true,
       claims: [
@@ -40,15 +74,66 @@ const SAMPLE_QUERIES = [
     },
   },
   {
-    name: "Driver License Query (mDOC)",
+    name: "Mobile Driving License (mDL) - mDOC",
     query: {
-      id: "dl_credential",
-      format: "mso_mdoc" as const,
+      id: "mdl",
+      format: "mso_mdoc",
       meta: { doctype_value: "org.iso.18013.5.1.mDL" },
       claims: [
         { path: ["org.iso.18013.5.1", "family_name"], intent_to_retain: true },
-        { path: ["org.iso.18013.5.1", "driving_privileges"], intent_to_retain: false },
+        {
+          path: ["org.iso.18013.5.1", "driving_privileges"],
+          intent_to_retain: false,
+        },
       ],
+      trusted_authorities: [
+        {
+          type: "aki",
+          values: ["two"],
+        },
+      ],
+    },
+  },
+  {
+    name: "Person Identification Data (PID) - SD-JWT VC",
+    query: {
+      id: "pid",
+      format: "dc+sd-jwt",
+      meta: {
+        vct_values: ["urn:eudi:pid:1"],
+      },
+      claims: [
+        { path: ["given_name"] },
+        { path: ["family_name"] },
+        { path: ["address", "street_address"] },
+      ],
+      require_cryptographic_holder_binding: true,
+    },
+  },
+  {
+    name: "University Degree - W3C",
+    query: {
+      id: "degree_credential",
+      format: "ldp_vc",
+      meta: {
+        type_values: [
+          [
+            "https://example.org/examples#AlumniCredential",
+            "https://example.org/examples#BachelorDegree",
+          ],
+          [
+            "https://www.w3.org/2018/credentials#VerifiableCredential",
+            "https://example.org/examples#UniversityDegreeCredential",
+          ],
+        ],
+      },
+      claims: [
+        { path: ["last_name"] },
+        { path: ["first_name"] },
+        { path: ["address", "street_address"] },
+      ],
+
+      require_cryptographic_holder_binding: true,
       trusted_authorities: [
         {
           type: "openid_federation",
@@ -57,122 +142,169 @@ const SAMPLE_QUERIES = [
       ],
     },
   },
-  {
-    name: "Identity Credential Query (SD-JWT VC)",
-    query: {
-      id: "identity_credential",
-      format: "vc+sd-jwt" as const,
-      meta: {
-        vct_values: ["https://credentials.example.com/identity_credential"],
-      },
-      claims: [
-        { path: ["last_name"], intent_to_retain: true },
-        { path: ["first_name"], intent_to_retain: true },
-        { path: ["address", "street_address"], intent_to_retain: false },
-      ],
-      require_cryptographic_holder_binding: true,
-    },
-  },
-  {
-    name: "University Degree Query (W3C)",
-    query: {
-      id: "degree_credential",
-      format: "ldp_vc" as const,
-      meta: {
-        type_values: [
-          ["https://example.org/examples#AlumniCredential", "https://example.org/examples#BachelorDegree"],
-          [
-            "https://www.w3.org/2018/credentials#VerifiableCredential",
-            "https://example.org/examples#UniversityDegreeCredential",
-          ],
-        ],
-      },
-      claims: [
-        { path: ["last_name"], intent_to_retain: true },
-        { path: ["first_name"], intent_to_retain: true },
-        { path: ["address", "street_address"], intent_to_retain: false },
-      ],
-      require_cryptographic_holder_binding: true,
-    },
-  },
-]
+] satisfies Array<{
+  name: string;
+  query: DcqlQuery.Input["credentials"][number];
+}>;
 
 const SAMPLE_CREDENTIALS = [
   {
-    name: "Vehicle Registration (mVRC)",
+    name: "Mobile Vehicle Registration Certificate (mVRC) - mDOC",
     credential: {
       credential_format: "mso_mdoc",
       doctype: "org.iso.7367.1.mVRC",
       namespaces: {
         "org.iso.7367.1": {
-          vehicle_holder: "Martin Auer",
-          non_disclosed: "secret",
+          registration_number: "11MM05",
+          date_of_registration: "2021-12-20T17:45:00Z",
+          date_of_first_registration: "2020-07-14",
+          vehicle_identification_number: "PD02-5016890",
+          vehicle_holder: [
+            {
+              family_name_unicode: "baron Van der Cërnosljé",
+              family_name_latin1: "baron Van der Cërnosljé",
+              given_name_unicode: "CBA",
+              given_name_latin1: "CBA",
+            },
+          ],
+          basic_vehicle_info: {
+            vehicle_category_code: "M1",
+            type_approval_number: "e1-test",
+            make: "OPEL",
+            commercial_name: "MITSU",
+            colours: [4, 9],
+          },
+          mass_info: {
+            unit: "kg",
+            techn_perm_max_laden_mass: 1290,
+            vehicle_max_mass: 1150,
+            whole_vehicle_max_mass: 2500,
+            mass_in_running_order: 920,
+          },
+          trailer_mass_info: {
+            unit: "kg",
+            tech_perm_max_tow_mass_braked_trail: 1750,
+            tech_perm_max_tow_mass_unbr_trailer: 459,
+          },
+          engine_info: {
+            engine_capacity: 999,
+            engine_power: 52,
+            energy_source: [15],
+          },
+          seating_info: {
+            nr_of_seating_positions: 5,
+            number_of_standing_places: 1,
+          },
+          un_distinguishing_sign: "NLD",
         },
-        "org.iso.18013.5.1": { first_name: "Martin Auer" },
+        "org.iso.18013.5.1": {
+          first_name: "CBA",
+        },
+        "org.iso.23220.1": {
+          issue_date: "2025-01-28",
+          expiry_date: "2035-01-28",
+          issuing_country: "NL",
+          issuing_authority_unicode: "Fime",
+          document_number: "0123456789",
+        },
       },
       authority: {
         type: "aki",
-        value: "one",
+        values: ["one"],
       },
       cryptographic_holder_binding: true,
     },
   },
   {
-    name: "Driver License (mDL)",
+    name: "Mobile Driving Licence (mDL) - mDOC",
     credential: {
       credential_format: "mso_mdoc",
       doctype: "org.iso.18013.5.1.mDL",
       namespaces: {
         "org.iso.18013.5.1": {
-          given_name: "Jake",
-          family_name: "Jakeson",
+          given_name: "Erika",
+          family_name: "Mustermann",
+          birth_date: "1964-08-12",
+          age_over_18: true,
+          document_number: "Z021AB37X13",
+          resident_postal_code: "90210",
+          un_distinguishing_sign: "D",
+          issuing_authority: "Bundesrepublik Deutschland",
+          issue_date: "2025-07-15", // serverStartupTime - 10 days (example)
+          expiry_date: "2026-07-25", // serverStartupTime + 1 year (example)
+          issuing_country: "NL",
           driving_privileges: [
             {
-              code: "B",
-            },
-            {
-              code: "A",
+              vehicle_category_code: "B",
+              issue_date: "2024-01-15",
+              expiry_date: "2039-01-14",
+              codes: [
+                { code: "B96", value: "4250", sign: "≤" },
+                { code: "70", value: "01.01" },
+                { code: "95", value: "2029-01-15" },
+                { code: "96", value: "750", sign: "≤" },
+              ],
             },
           ],
+          portrait: "...",
         },
       },
       authority: {
-        type: "openid_federation",
-        value: "https://federation.com",
+        type: "aki",
+        values: ["two"],
       },
       cryptographic_holder_binding: true,
     },
   },
   {
-    name: "Identity Credential (SD-JWT VC)",
+    name: "Person Identification Data (PID) - SD-JWT VC",
     credential: {
-      credential_format: "vc+sd-jwt",
-      vct: "https://credentials.example.com/identity_credential",
+      credential_format: "dc+sd-jwt",
+      vct: "urn:eudi:pid:1",
       claims: {
-        first_name: "Arthur",
-        last_name: "Dent",
+        given_name: "Arthur",
+        family_name: "Dent",
+        birthdate: "1978-03-11",
+        place_of_birth: {
+          locality: "Milliways",
+        },
         address: {
           street_address: "42 Market Street",
           locality: "Milliways",
           postal_code: "12345",
+          region: "Outer Rim",
+          country: "GB",
         },
-        degrees: [
-          {
-            type: "Bachelor of Science",
-            university: "University of Betelgeuse",
-          },
-          {
-            type: "Master of Science",
-            university: "University of Betelgeuse",
-          },
-        ],
-        nationalities: ["British", "Betelgeusian"],
+        nationalities: ["GB", "BG"],
+
+        age_equal_or_over: {
+          18: true,
+          21: true,
+          65: false,
+        },
+        age_in_years: 47,
+        age_birth_year: 1978,
+
+        sex: 1,
+
+        email: "arthur.dent@galacticmail.org",
+        phone_number: "+441234567890",
+
+        picture: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...", // (truncated base64 JPEG)
+
+        issuing_authority: "GB",
+        issuing_country: "GB",
+        date_of_issuance: "2024-06-15",
+        date_of_expiry: "2034-06-15",
+        document_number: "GBDNT123456789",
+
+        trust_anchor: "https://pid.trust-anchor.eu/metadata/gb",
       },
       cryptographic_holder_binding: true,
     },
   },
   {
-    name: "University Degree (W3C VC)",
+    name: "University Degree - W3C VC",
     credential: {
       credential_format: "ldp_vc",
       type: [
@@ -200,41 +332,44 @@ const SAMPLE_CREDENTIALS = [
         ],
         nationalities: ["British", "Betelgeusian"],
       },
+      authority: {
+        type: "openid_federation",
+        values: ["https://federation.com"],
+      },
       cryptographic_holder_binding: true,
     },
   },
-]
+] satisfies Array<{ name: string; credential: DcqlCredential }>;
 
 /* ------------------------------------------------------------------ */
 /*  TYPES                                                             */
 /* ------------------------------------------------------------------ */
 interface CredentialSet {
-  options: string[][]
-  required: boolean
+  options: string[][];
+  required: boolean;
 }
 
 /* ------------------------------------------------------------------ */
 /*  SMALL UTILS                                                       */
 /* ------------------------------------------------------------------ */
 function useDebounce<T extends (...a: any) => any>(fn: T, delay = 800) {
-  const timer = useRef<NodeJS.Timeout | null>(null)
+  const timer = useRef<NodeJS.Timeout | null>(null);
   return useCallback(
     (...args: Parameters<T>) => {
-      if (timer.current) clearTimeout(timer.current)
-      timer.current = setTimeout(() => fn(...args), delay)
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => fn(...args), delay);
     },
-    [fn, delay],
-  )
+    [fn, delay]
+  );
 }
-
 
 /* ------------------------------------------------------------------ */
 /*  CREDENTIAL SET BUILDER COMPONENTS                                 */
 /* ------------------------------------------------------------------ */
 interface CredentialSetBuilderProps {
-  credentialSets: CredentialSet[]
-  onCredentialSetsChange: (sets: CredentialSet[]) => void
-  availableCredentialIds: string[]
+  credentialSets: CredentialSet[];
+  onCredentialSetsChange: (sets: CredentialSet[]) => void;
+  availableCredentialIds: string[];
 }
 
 function CredentialSetBuilder({
@@ -242,47 +377,61 @@ function CredentialSetBuilder({
   onCredentialSetsChange,
   availableCredentialIds,
 }: CredentialSetBuilderProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [editingSets, setEditingSets] = useState<CredentialSet[]>(credentialSets)
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingSets, setEditingSets] =
+    useState<CredentialSet[]>(credentialSets);
 
   useEffect(() => {
-    setEditingSets(credentialSets)
-  }, [credentialSets])
+    setEditingSets(credentialSets);
+  }, [credentialSets]);
 
   const handleSave = () => {
-    onCredentialSetsChange(editingSets)
-    setIsOpen(false)
-  }
+    onCredentialSetsChange(editingSets);
+    setIsOpen(false);
+  };
 
   const addCredentialSet = () => {
-    setEditingSets([...editingSets, { options: [[]], required: true }])
-  }
+    setEditingSets([...editingSets, { options: [[]], required: true }]);
+  };
 
   const removeCredentialSet = (setIndex: number) => {
-    setEditingSets(editingSets.filter((_, index) => index !== setIndex))
-  }
+    setEditingSets(editingSets.filter((_, index) => index !== setIndex));
+  };
 
-  const updateCredentialSet = (setIndex: number, updates: Partial<CredentialSet>) => {
-    setEditingSets(editingSets.map((set, index) => (index === setIndex ? { ...set, ...updates } : set)))
-  }
+  const updateCredentialSet = (
+    setIndex: number,
+    updates: Partial<CredentialSet>
+  ) => {
+    setEditingSets(
+      editingSets.map((set, index) =>
+        index === setIndex ? { ...set, ...updates } : set
+      )
+    );
+  };
 
   const addOption = (setIndex: number) => {
-    const newSets = [...editingSets]
-    newSets[setIndex].options.push([])
-    setEditingSets(newSets)
-  }
+    const newSets = [...editingSets];
+    newSets[setIndex].options.push([]);
+    setEditingSets(newSets);
+  };
 
   const removeOption = (setIndex: number, optionIndex: number) => {
-    const newSets = [...editingSets]
-    newSets[setIndex].options = newSets[setIndex].options.filter((_, index) => index !== optionIndex)
-    setEditingSets(newSets)
-  }
+    const newSets = [...editingSets];
+    newSets[setIndex].options = newSets[setIndex].options.filter(
+      (_, index) => index !== optionIndex
+    );
+    setEditingSets(newSets);
+  };
 
-  const updateOption = (setIndex: number, optionIndex: number, credentialIds: string[]) => {
-    const newSets = [...editingSets]
-    newSets[setIndex].options[optionIndex] = credentialIds
-    setEditingSets(newSets)
-  }
+  const updateOption = (
+    setIndex: number,
+    optionIndex: number,
+    credentialIds: string[]
+  ) => {
+    const newSets = [...editingSets];
+    newSets[setIndex].options[optionIndex] = credentialIds;
+    setEditingSets(newSets);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -308,9 +457,14 @@ function CredentialSetBuilder({
                       <Switch
                         id={`required-${setIndex}`}
                         checked={credentialSet.required}
-                        onCheckedChange={(checked) => updateCredentialSet(setIndex, { required: checked })}
+                        onCheckedChange={(checked) =>
+                          updateCredentialSet(setIndex, { required: checked })
+                        }
                       />
-                      <Label htmlFor={`required-${setIndex}`} className="text-xs">
+                      <Label
+                        htmlFor={`required-${setIndex}`}
+                        className="text-xs"
+                      >
                         Required
                       </Label>
                     </div>
@@ -327,9 +481,14 @@ function CredentialSetBuilder({
               </CardHeader>
               <CardContent className="space-y-3">
                 {credentialSet.options.map((option, optionIndex) => (
-                  <div key={optionIndex} className="border rounded-md p-3 space-y-2">
+                  <div
+                    key={optionIndex}
+                    className="border rounded-md p-3 space-y-2"
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium">Option {optionIndex + 1}</span>
+                      <span className="text-xs font-medium">
+                        Option {optionIndex + 1}
+                      </span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -342,11 +501,18 @@ function CredentialSetBuilder({
                     <CredentialIdMultiSelect
                       selectedIds={option}
                       availableIds={availableCredentialIds}
-                      onSelectionChange={(ids) => updateOption(setIndex, optionIndex, ids)}
+                      onSelectionChange={(ids) =>
+                        updateOption(setIndex, optionIndex, ids)
+                      }
                     />
                   </div>
                 ))}
-                <Button variant="outline" size="sm" onClick={() => addOption(setIndex)} className="w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addOption(setIndex)}
+                  className="w-full"
+                >
                   <Plus className="h-3 w-3 mr-1" />
                   Add Option
                 </Button>
@@ -355,7 +521,11 @@ function CredentialSetBuilder({
           ))}
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={addCredentialSet} className="flex-1 bg-transparent">
+            <Button
+              variant="outline"
+              onClick={addCredentialSet}
+              className="flex-1 bg-transparent"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Credential Set
             </Button>
@@ -372,25 +542,29 @@ function CredentialSetBuilder({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 interface CredentialIdMultiSelectProps {
-  selectedIds: string[]
-  availableIds: string[]
-  onSelectionChange: (ids: string[]) => void
+  selectedIds: string[];
+  availableIds: string[];
+  onSelectionChange: (ids: string[]) => void;
 }
 
-function CredentialIdMultiSelect({ selectedIds, availableIds, onSelectionChange }: CredentialIdMultiSelectProps) {
-  const [isOpen, setIsOpen] = useState(false)
+function CredentialIdMultiSelect({
+  selectedIds,
+  availableIds,
+  onSelectionChange,
+}: CredentialIdMultiSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
 
   const handleToggle = (id: string) => {
     if (selectedIds.includes(id)) {
-      onSelectionChange(selectedIds.filter((selectedId) => selectedId !== id))
+      onSelectionChange(selectedIds.filter((selectedId) => selectedId !== id));
     } else {
-      onSelectionChange([...selectedIds, id])
+      onSelectionChange([...selectedIds, id]);
     }
-  }
+  };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -403,7 +577,9 @@ function CredentialIdMultiSelect({ selectedIds, availableIds, onSelectionChange 
         >
           <div className="flex flex-wrap gap-1">
             {selectedIds.length === 0 ? (
-              <span className="text-muted-foreground">Select credential IDs...</span>
+              <span className="text-muted-foreground">
+                Select credential IDs...
+              </span>
             ) : (
               selectedIds.map((id) => (
                 <Badge key={id} variant="outline" className="text-xs">
@@ -417,13 +593,24 @@ function CredentialIdMultiSelect({ selectedIds, availableIds, onSelectionChange 
       </PopoverTrigger>
       <PopoverContent className="w-full p-0">
         <Command>
-          <CommandInput placeholder="Search credential IDs..." className="h-9" />
+          <CommandInput
+            placeholder="Search credential IDs..."
+            className="h-9"
+          />
           <CommandList>
             <CommandEmpty>No credential IDs found.</CommandEmpty>
             <CommandGroup>
               {availableIds.map((id) => (
-                <CommandItem key={id} value={id} onSelect={() => handleToggle(id)}>
-                  <Check className={`mr-2 h-4 w-4 ${selectedIds.includes(id) ? "opacity-100" : "opacity-0"}`} />
+                <CommandItem
+                  key={id}
+                  value={id}
+                  onSelect={() => handleToggle(id)}
+                >
+                  <Check
+                    className={`mr-2 h-4 w-4 ${
+                      selectedIds.includes(id) ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
                   <span className="text-xs">{id}</span>
                 </CommandItem>
               ))}
@@ -432,23 +619,25 @@ function CredentialIdMultiSelect({ selectedIds, availableIds, onSelectionChange 
         </Command>
       </PopoverContent>
     </Popover>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
 /*  VISUALIZATION COMPONENTS                                          */
 /* ------------------------------------------------------------------ */
 interface VisualizationProps {
-  data: any
+  data: any;
 }
 
 function ResultsVisualization({ data }: VisualizationProps) {
   if (!data || typeof data !== "object") {
-    return <div className="p-4 text-muted-foreground">No results to display</div>
+    return (
+      <div className="p-4 text-muted-foreground">No results to display</div>
+    );
   }
 
-  const canBeSatisfied = data.can_be_satisfied
-  const credentialMatches = data.credential_matches || {}
+  const canBeSatisfied = data.can_be_satisfied;
+  const credentialMatches = data.credential_matches || {};
 
   return (
     <div className="p-4 space-y-4">
@@ -497,19 +686,31 @@ function ResultsVisualization({ data }: VisualizationProps) {
 
       {/* Credential Matches */}
       <div className="space-y-3">
-        {Object.entries(credentialMatches).map(([queryId, match]: [string, any]) => (
-          <CredentialMatchCard key={queryId} queryId={queryId} match={match} />
-        ))}
+        {Object.entries(credentialMatches).map(
+          ([queryId, match]: [string, any]) => (
+            <CredentialMatchCard
+              key={queryId}
+              queryId={queryId}
+              match={match}
+            />
+          )
+        )}
       </div>
     </div>
-  )
+  );
 }
 
-function CredentialMatchCard({ queryId, match }: { queryId: string; match: any }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const success = match.success
-  const validCredentials = match.valid_credentials || []
-  const failedCredentials = match.failed_credentials || []
+function CredentialMatchCard({
+  queryId,
+  match,
+}: {
+  queryId: string;
+  match: any;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const success = match.success;
+  const validCredentials = match.valid_credentials || [];
+  const failedCredentials = match.failed_credentials || [];
 
   return (
     <Card>
@@ -524,7 +725,10 @@ function CredentialMatchCard({ queryId, match }: { queryId: string; match: any }
                   <XCircle className="h-4 w-4 text-red-500" />
                 )}
                 <span>{queryId}</span>
-                <Badge variant={success ? "default" : "destructive"} className="text-xs">
+                <Badge
+                  variant={success ? "default" : "destructive"}
+                  className="text-xs"
+                >
                   {success ? "Success" : "Failed"}
                 </Badge>
               </div>
@@ -546,7 +750,11 @@ function CredentialMatchCard({ queryId, match }: { queryId: string; match: any }
                   </h4>
                   <div className="space-y-2">
                     {validCredentials.map((cred: any, index: number) => (
-                      <CredentialCard key={index} credential={cred} isValid={true} />
+                      <CredentialCard
+                        key={index}
+                        credential={cred}
+                        isValid={true}
+                      />
                     ))}
                   </div>
                 </div>
@@ -560,7 +768,11 @@ function CredentialMatchCard({ queryId, match }: { queryId: string; match: any }
                   </h4>
                   <div className="space-y-2">
                     {failedCredentials.map((cred: any, index: number) => (
-                      <CredentialCard key={index} credential={cred} isValid={false} />
+                      <CredentialCard
+                        key={index}
+                        credential={cred}
+                        isValid={false}
+                      />
                     ))}
                   </div>
                 </div>
@@ -570,15 +782,24 @@ function CredentialMatchCard({ queryId, match }: { queryId: string; match: any }
         </CollapsibleContent>
       </Collapsible>
     </Card>
-  )
+  );
 }
 
-function CredentialCard({ credential, isValid }: { credential: any; isValid: boolean }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const credentialIndex = credential.input_credential_index
+function CredentialCard({
+  credential,
+  isValid,
+}: {
+  credential: any;
+  isValid: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const credentialIndex = credential.input_credential_index;
 
   return (
-    <Card className="border-l-4" style={{ borderLeftColor: isValid ? "#22c55e" : "#ef4444" }}>
+    <Card
+      className="border-l-4"
+      style={{ borderLeftColor: isValid ? "#22c55e" : "#ef4444" }}
+    >
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3">
@@ -592,7 +813,8 @@ function CredentialCard({ credential, isValid }: { credential: any; isValid: boo
                 <span>Credential {credentialIndex}</span>
               </div>
               <Badge variant="outline" className="text-xs">
-                {SAMPLE_CREDENTIALS[credentialIndex]?.name || `Credential ${credentialIndex}`}
+                {SAMPLE_CREDENTIALS[credentialIndex]?.name ||
+                  `Credential ${credentialIndex}`}
               </Badge>
             </CardTitle>
           </CardHeader>
@@ -611,17 +833,25 @@ function CredentialCard({ credential, isValid }: { credential: any; isValid: boo
             <ValidationSection
               title="Trusted Authorities"
               success={credential.trusted_authorities?.success}
-              issues={credential.trusted_authorities?.failed_trusted_authorities}
-              output={credential.trusted_authorities?.valid_trusted_authority?.output}
+              issues={
+                credential.trusted_authorities?.failed_trusted_authorities
+              }
+              output={
+                credential.trusted_authorities?.valid_trusted_authority?.output
+              }
             />
 
             {/* Claims */}
-            <ValidationSection title="Claims" success={credential.claims?.success} claimsData={credential.claims} />
+            <ValidationSection
+              title="Claims"
+              success={credential.claims?.success}
+              claimsData={credential.claims}
+            />
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
     </Card>
-  )
+  );
 }
 
 function ValidationSection({
@@ -630,8 +860,14 @@ function ValidationSection({
   issues,
   output,
   claimsData,
-}: { title: string; success?: boolean; issues?: any; output?: any; claimsData?: any }) {
-  const [isOpen, setIsOpen] = useState(false)
+}: {
+  title: string;
+  success?: boolean;
+  issues?: any;
+  output?: any;
+  claimsData?: any;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className="border rounded-md">
@@ -646,7 +882,10 @@ function ValidationSection({
               )}
               <span className="text-xs font-medium">{title}</span>
             </div>
-            <Badge variant={success ? "default" : "destructive"} className="text-xs">
+            <Badge
+              variant={success ? "default" : "destructive"}
+              className="text-xs"
+            >
               {success ? "Valid" : "Invalid"}
             </Badge>
           </div>
@@ -661,7 +900,9 @@ function ValidationSection({
                 {/* Show output for successful validations */}
                 {success && output && (
                   <div className="space-y-2">
-                    <h5 className="text-xs font-medium text-green-700 dark:text-green-400">Output:</h5>
+                    <h5 className="text-xs font-medium text-green-700 dark:text-green-400">
+                      Output:
+                    </h5>
                     <div className="bg-muted/50 rounded p-2">
                       <pre className="text-xs text-green-800 dark:text-green-200 whitespace-pre-wrap overflow-auto">
                         {JSON.stringify(output, null, 2)}
@@ -673,32 +914,51 @@ function ValidationSection({
                 {/* Show issues for failed validations */}
                 {!success && issues && (
                   <div className="space-y-2">
-                    <h5 className="text-xs font-medium text-muted-foreground">Issues:</h5>
+                    <h5 className="text-xs font-medium text-muted-foreground">
+                      Issues:
+                    </h5>
                     {/* Handle trusted authorities array */}
                     {Array.isArray(issues)
                       ? issues.map((failedAuth: any, index: number) => (
-                          <div key={index} className="border rounded p-2 space-y-2">
+                          <div
+                            key={index}
+                            className="border rounded p-2 space-y-2"
+                          >
                             <div className="text-xs font-medium text-red-700 dark:text-red-400">
-                              Trusted Authority {failedAuth.trusted_authority_index}:
+                              Trusted Authority{" "}
+                              {failedAuth.trusted_authority_index}:
                             </div>
                             {failedAuth.issues &&
-                              Object.entries(failedAuth.issues).map(([key, messages]: [string, any]) => (
-                                <div key={key} className="space-y-1 ml-2">
-                                  <div className="text-xs font-medium text-red-600 dark:text-red-300">{key}:</div>
-                                  {Array.isArray(messages) ? (
-                                    messages.map((message: string, msgIndex: number) => (
-                                      <div key={msgIndex} className="text-xs text-red-500 dark:text-red-400 ml-2">
-                                        • {message}
+                              Object.entries(failedAuth.issues).map(
+                                ([key, messages]: [string, any]) => (
+                                  <div key={key} className="space-y-1 ml-2">
+                                    <div className="text-xs font-medium text-red-600 dark:text-red-300">
+                                      {key}:
+                                    </div>
+                                    {Array.isArray(messages) ? (
+                                      messages.map(
+                                        (message: string, msgIndex: number) => (
+                                          <div
+                                            key={msgIndex}
+                                            className="text-xs text-red-500 dark:text-red-400 ml-2"
+                                          >
+                                            • {message}
+                                          </div>
+                                        )
+                                      )
+                                    ) : (
+                                      <div className="text-xs text-red-500 dark:text-red-400 ml-2">
+                                        • {messages}
                                       </div>
-                                    ))
-                                  ) : (
-                                    <div className="text-xs text-red-500 dark:text-red-400 ml-2">• {messages}</div>
-                                  )}
-                                </div>
-                              ))}
+                                    )}
+                                  </div>
+                                )
+                              )}
                             {failedAuth.output && (
                               <div className="ml-2">
-                                <div className="text-xs font-medium text-muted-foreground">Received:</div>
+                                <div className="text-xs font-medium text-muted-foreground">
+                                  Received:
+                                </div>
                                 <div className="bg-muted/30 rounded p-1 mt-1">
                                   <pre className="text-xs text-muted-foreground whitespace-pre-wrap">
                                     {JSON.stringify(failedAuth.output, null, 2)}
@@ -711,20 +971,31 @@ function ValidationSection({
                       : /* Handle regular issues object */
                         issues &&
                         Object.keys(issues).length > 0 &&
-                        Object.entries(issues).map(([key, messages]: [string, any]) => (
-                          <div key={key} className="space-y-1">
-                            <div className="text-xs font-medium text-red-700 dark:text-red-400">{key}:</div>
-                            {Array.isArray(messages) ? (
-                              messages.map((message: string, index: number) => (
-                                <div key={index} className="text-xs text-red-600 dark:text-red-300 ml-2">
-                                  • {message}
+                        Object.entries(issues).map(
+                          ([key, messages]: [string, any]) => (
+                            <div key={key} className="space-y-1">
+                              <div className="text-xs font-medium text-red-700 dark:text-red-400">
+                                {key}:
+                              </div>
+                              {Array.isArray(messages) ? (
+                                messages.map(
+                                  (message: string, index: number) => (
+                                    <div
+                                      key={index}
+                                      className="text-xs text-red-600 dark:text-red-300 ml-2"
+                                    >
+                                      • {message}
+                                    </div>
+                                  )
+                                )
+                              ) : (
+                                <div className="text-xs text-red-600 dark:text-red-300 ml-2">
+                                  • {messages}
                                 </div>
-                              ))
-                            ) : (
-                              <div className="text-xs text-red-600 dark:text-red-300 ml-2">• {messages}</div>
-                            )}
-                          </div>
-                        ))}
+                              )}
+                            </div>
+                          )
+                        )}
                   </div>
                 )}
               </>
@@ -733,14 +1004,14 @@ function ValidationSection({
         </CollapsibleContent>
       </Collapsible>
     </div>
-  )
+  );
 }
 
 function ClaimsDetailView({ claimsData }: { claimsData: any }) {
-  const validClaims = claimsData.valid_claims || []
-  const failedClaims = claimsData.failed_claims || []
-  const validClaimSets = claimsData.valid_claim_sets || []
-  const failedClaimSets = claimsData.failed_claim_sets || []
+  const validClaims = claimsData.valid_claims || [];
+  const failedClaims = claimsData.failed_claims || [];
+  const validClaimSets = claimsData.valid_claim_sets || [];
+  const failedClaimSets = claimsData.failed_claim_sets || [];
 
   return (
     <div className="space-y-4">
@@ -785,7 +1056,10 @@ function ClaimsDetailView({ claimsData }: { claimsData: any }) {
             </h5>
             <div className="space-y-2">
               {failedClaims.map((claim: any, index: number) => (
-                <div key={index} className="border-l-2 border-red-500 pl-2 bg-red-50/50 dark:bg-red-950/20 rounded p-2">
+                <div
+                  key={index}
+                  className="border-l-2 border-red-500 pl-2 bg-red-50/50 dark:bg-red-950/20 rounded p-2"
+                >
                   <div className="flex items-center gap-2 mb-1">
                     <XCircle className="h-3 w-3 text-red-500" />
                     <span className="text-xs font-medium">
@@ -794,25 +1068,38 @@ function ClaimsDetailView({ claimsData }: { claimsData: any }) {
                   </div>
                   {claim.issues && (
                     <div className="space-y-1 mt-2">
-                      {Object.entries(claim.issues).map(([key, messages]: [string, any]) => (
-                        <div key={key} className="space-y-1">
-                          <div className="text-xs font-medium text-red-600 dark:text-red-300">{key}:</div>
-                          {Array.isArray(messages) ? (
-                            messages.map((message: string, msgIndex: number) => (
-                              <div key={msgIndex} className="text-xs text-red-500 dark:text-red-400 ml-2">
-                                • {message}
+                      {Object.entries(claim.issues).map(
+                        ([key, messages]: [string, any]) => (
+                          <div key={key} className="space-y-1">
+                            <div className="text-xs font-medium text-red-600 dark:text-red-300">
+                              {key}:
+                            </div>
+                            {Array.isArray(messages) ? (
+                              messages.map(
+                                (message: string, msgIndex: number) => (
+                                  <div
+                                    key={msgIndex}
+                                    className="text-xs text-red-500 dark:text-red-400 ml-2"
+                                  >
+                                    • {message}
+                                  </div>
+                                )
+                              )
+                            ) : (
+                              <div className="text-xs text-red-500 dark:text-red-400 ml-2">
+                                • {messages}
                               </div>
-                            ))
-                          ) : (
-                            <div className="text-xs text-red-500 dark:text-red-400 ml-2">• {messages}</div>
-                          )}
-                        </div>
-                      ))}
+                            )}
+                          </div>
+                        )
+                      )}
                     </div>
                   )}
                   {claim.output && Object.keys(claim.output).length > 0 && (
                     <div className="mt-2">
-                      <div className="text-xs font-medium text-muted-foreground">Received:</div>
+                      <div className="text-xs font-medium text-muted-foreground">
+                        Received:
+                      </div>
                       <div className="bg-muted/30 rounded p-1 mt-1">
                         <pre className="text-xs text-muted-foreground whitespace-pre-wrap">
                           {JSON.stringify(claim.output, null, 2)}
@@ -830,7 +1117,9 @@ function ClaimsDetailView({ claimsData }: { claimsData: any }) {
       {/* Claim Sets */}
       {(validClaimSets.length > 0 || failedClaimSets.length > 0) && (
         <div className="border-t pt-3 space-y-3">
-          <h5 className="text-xs font-medium text-muted-foreground">Claim Sets</h5>
+          <h5 className="text-xs font-medium text-muted-foreground">
+            Claim Sets
+          </h5>
 
           {/* Valid Claim Sets */}
           {validClaimSets.length > 0 && (
@@ -847,11 +1136,15 @@ function ClaimsDetailView({ claimsData }: { claimsData: any }) {
                     <div className="flex items-center gap-2 mb-1">
                       <CheckCircle className="h-3 w-3 text-green-500" />
                       <span className="text-xs font-medium">
-                        Claim Set {claimSet.claim_set_index !== undefined ? claimSet.claim_set_index : index}
+                        Claim Set{" "}
+                        {claimSet.claim_set_index !== undefined
+                          ? claimSet.claim_set_index
+                          : index}
                       </span>
                       {claimSet.valid_claim_indexes && (
                         <Badge variant="outline" className="text-xs">
-                          Claim Indexes: {claimSet.valid_claim_indexes.join(", ")}
+                          Claim Indexes:{" "}
+                          {claimSet.valid_claim_indexes.join(", ")}
                         </Badge>
                       )}
                     </div>
@@ -883,37 +1176,61 @@ function ClaimsDetailView({ claimsData }: { claimsData: any }) {
                     <div className="flex items-center gap-2 mb-1">
                       <XCircle className="h-3 w-3 text-red-500" />
                       <span className="text-xs font-medium">
-                        Claim Set {claimSet.claim_set_index !== undefined ? claimSet.claim_set_index : index}
+                        Claim Set{" "}
+                        {claimSet.claim_set_index !== undefined
+                          ? claimSet.claim_set_index
+                          : index}
                       </span>
                       <div className="flex gap-1">
-                        {claimSet.valid_claim_indexes && claimSet.valid_claim_indexes.length > 0 && (
-                          <Badge variant="outline" className="text-xs text-green-600">
-                            Valid Indexes: {claimSet.valid_claim_indexes.join(", ")}
-                          </Badge>
-                        )}
-                        {claimSet.failed_claim_indexes && claimSet.failed_claim_indexes.length > 0 && (
-                          <Badge variant="outline" className="text-xs text-red-600">
-                            Failed Indexes: {claimSet.failed_claim_indexes.join(", ")}
-                          </Badge>
-                        )}
+                        {claimSet.valid_claim_indexes &&
+                          claimSet.valid_claim_indexes.length > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-green-600"
+                            >
+                              Valid Indexes:{" "}
+                              {claimSet.valid_claim_indexes.join(", ")}
+                            </Badge>
+                          )}
+                        {claimSet.failed_claim_indexes &&
+                          claimSet.failed_claim_indexes.length > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-red-600"
+                            >
+                              Failed Indexes:{" "}
+                              {claimSet.failed_claim_indexes.join(", ")}
+                            </Badge>
+                          )}
                       </div>
                     </div>
                     {claimSet.issues && (
                       <div className="space-y-1 mt-2">
-                        {Object.entries(claimSet.issues).map(([key, messages]: [string, any]) => (
-                          <div key={key} className="space-y-1">
-                            <div className="text-xs font-medium text-red-600 dark:text-red-300">{key}:</div>
-                            {Array.isArray(messages) ? (
-                              messages.map((message: string, msgIndex: number) => (
-                                <div key={msgIndex} className="text-xs text-red-500 dark:text-red-400 ml-2">
-                                  • {message}
+                        {Object.entries(claimSet.issues).map(
+                          ([key, messages]: [string, any]) => (
+                            <div key={key} className="space-y-1">
+                              <div className="text-xs font-medium text-red-600 dark:text-red-300">
+                                {key}:
+                              </div>
+                              {Array.isArray(messages) ? (
+                                messages.map(
+                                  (message: string, msgIndex: number) => (
+                                    <div
+                                      key={msgIndex}
+                                      className="text-xs text-red-500 dark:text-red-400 ml-2"
+                                    >
+                                      • {message}
+                                    </div>
+                                  )
+                                )
+                              ) : (
+                                <div className="text-xs text-red-500 dark:text-red-400 ml-2">
+                                  • {messages}
                                 </div>
-                              ))
-                            ) : (
-                              <div className="text-xs text-red-500 dark:text-red-400 ml-2">• {messages}</div>
-                            )}
-                          </div>
-                        ))}
+                              )}
+                            </div>
+                          )
+                        )}
                       </div>
                     )}
                   </div>
@@ -924,27 +1241,37 @@ function ClaimsDetailView({ claimsData }: { claimsData: any }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function CredentialSetCard({
   credentialSet,
   setIndex,
   credentialMatches,
-}: { credentialSet: any; setIndex: number; credentialMatches: any }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const isRequired = credentialSet.required
-  const options = credentialSet.options || []
-  const matchingOptions = credentialSet.matching_options || []
-  const hasMatches = matchingOptions.length > 0
+}: {
+  credentialSet: any;
+  setIndex: number;
+  credentialMatches: any;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const isRequired = credentialSet.required;
+  const options = credentialSet.options || [];
+  const matchingOptions = credentialSet.matching_options || [];
+  const hasMatches = matchingOptions.length > 0;
 
   // Get all available credential IDs from credential matches
-  const availableCredentialIds = Object.keys(credentialMatches)
+  const availableCredentialIds = Object.keys(credentialMatches);
 
   return (
     <Card
       className="border-l-4"
-      style={{ borderLeftColor: hasMatches ? "#22c55e" : isRequired ? "#ef4444" : "#f59e0b" }}
+      style={{
+        borderLeftColor: hasMatches
+          ? "#22c55e"
+          : isRequired
+          ? "#ef4444"
+          : "#f59e0b",
+      }}
     >
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
@@ -959,11 +1286,19 @@ function CredentialSetCard({
                   <AlertCircle className="h-4 w-4 text-yellow-500" />
                 )}
                 <span>Credential Set {setIndex}</span>
-                <Badge variant={isRequired ? "default" : "secondary"} className="text-xs">
+                <Badge
+                  variant={isRequired ? "default" : "secondary"}
+                  className="text-xs"
+                >
                   {isRequired ? "Required" : "Optional"}
                 </Badge>
-                <Badge variant={hasMatches ? "default" : "destructive"} className="text-xs">
-                  {hasMatches ? `${matchingOptions.length} Matching` : "No Matches"}
+                <Badge
+                  variant={hasMatches ? "default" : "destructive"}
+                  className="text-xs"
+                >
+                  {hasMatches
+                    ? `${matchingOptions.length} Matching`
+                    : "No Matches"}
                 </Badge>
               </div>
             </CardTitle>
@@ -975,14 +1310,18 @@ function CredentialSetCard({
             <div className="space-y-2">
               {options.map((option: string[], optionIndex: number) => {
                 const isMatching = matchingOptions.some(
-                  (matchingOption: string[]) => JSON.stringify(matchingOption.sort()) === JSON.stringify(option.sort()),
-                )
+                  (matchingOption: string[]) =>
+                    JSON.stringify(matchingOption.sort()) ===
+                    JSON.stringify(option.sort())
+                );
 
                 return (
                   <div
                     key={optionIndex}
                     className={`border rounded-md p-3 ${
-                      isMatching ? "border-green-500 bg-green-50/50 dark:bg-green-950/20" : "border-muted bg-muted/30"
+                      isMatching
+                        ? "border-green-500 bg-green-50/50 dark:bg-green-950/20"
+                        : "border-muted bg-muted/30"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
@@ -998,7 +1337,8 @@ function CredentialSetCard({
                     <div className="flex flex-wrap gap-1">
                       {option.map((credentialId: string, credIndex: number) => {
                         // Check if this specific credential ID has a successful match
-                        const credentialHasMatch = credentialMatches[credentialId]?.success || false
+                        const credentialHasMatch =
+                          credentialMatches[credentialId]?.success || false;
 
                         return (
                           <Badge
@@ -1017,11 +1357,11 @@ function CredentialSetCard({
                             )}
                             {credentialId}
                           </Badge>
-                        )
+                        );
                       })}
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
 
@@ -1040,131 +1380,148 @@ function CredentialSetCard({
         </CollapsibleContent>
       </Collapsible>
     </Card>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
 /*  MAIN COMPONENT                                                    */
 /* ------------------------------------------------------------------ */
 export function DCQLPlayground() {
-  const { theme, setTheme } = useTheme()
-  const [selectedQueryIndices, setSelectedQueryIndices] = useState<number[]>([0])
-  const [selectedCredentialIndices, setSelectedCredentialIndices] = useState<number[]>([0, 1, 2, 3]) // All pre-selected
-  const [credentialSets, setCredentialSets] = useState<CredentialSet[]>([])
-  const [query, setQuery] = useState("")
-  const [creds, setCreds] = useState("")
-  const [result, setResult] = useState("[]")
-  const [resultData, setResultData] = useState<any>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
-  const [queryPopoverOpen, setQueryPopoverOpen] = useState(false)
-  const [credentialPopoverOpen, setCredentialPopoverOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<"code" | "visual">("visual")
+  const { theme, setTheme } = useTheme();
+  const [selectedQueryIndices, setSelectedQueryIndices] = useState<number[]>([
+    0,
+  ]);
+  const [selectedCredentialIndices, setSelectedCredentialIndices] = useState<
+    number[]
+  >([0, 1, 2, 3]); // All pre-selected
+  const [credentialSets, setCredentialSets] = useState<CredentialSet[]>([]);
+  const [query, setQuery] = useState("");
+  const [creds, setCreds] = useState("");
+  const [result, setResult] = useState("[]");
+  const [resultData, setResultData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [queryPopoverOpen, setQueryPopoverOpen] = useState(false);
+  const [credentialPopoverOpen, setCredentialPopoverOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"code" | "visual">("visual");
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => setMounted(true), []);
 
-    // Get available credential IDs from selected queries
-  const availableCredentialIds = selectedQueryIndices.map((index) => SAMPLE_QUERIES[index].query.id)
+  // Get available credential IDs from selected queries
+  const availableCredentialIds = selectedQueryIndices.map(
+    (index) => SAMPLE_QUERIES[index].query.id
+  );
 
   // Generate combined query from selected indices
-  const generateCombinedQuery = useCallback((indices: number[], sets: CredentialSet[]) => {
-    if (indices.length === 0) {
-      return JSON.stringify({ credentials: [] }, null, 2)
-    }
+  const generateCombinedQuery = useCallback(
+    (indices: number[], sets: CredentialSet[]) => {
+      if (indices.length === 0) {
+        return JSON.stringify({ credentials: [] }, null, 2);
+      }
 
-    const selectedCredentials = indices.map((index) => SAMPLE_QUERIES[index].query)
-    const combinedQuery: any = {
-      credentials: selectedCredentials,
-    }
+      const selectedCredentials = indices.map(
+        (index) => SAMPLE_QUERIES[index].query
+      );
+      const combinedQuery: any = {
+        credentials: selectedCredentials,
+      };
 
-    // Add credential sets if any exist
-    if (sets.length > 0) {
-      combinedQuery.credential_sets = sets
-    }
+      // Add credential sets if any exist
+      if (sets.length > 0) {
+        combinedQuery.credential_sets = sets;
+      }
 
-    return JSON.stringify(combinedQuery, null, 2)
-  }, [])
+      return JSON.stringify(combinedQuery, null, 2);
+    },
+    []
+  );
 
   // Generate combined credentials from selected indices
   const generateCombinedCredentials = useCallback((indices: number[]) => {
     if (indices.length === 0) {
-      return JSON.stringify([], null, 2)
+      return JSON.stringify([], null, 2);
     }
 
-    const selectedCredentials = indices.map((index) => SAMPLE_CREDENTIALS[index].credential)
-    return JSON.stringify(selectedCredentials, null, 2)
-  }, [])
+    const selectedCredentials = indices.map(
+      (index) => SAMPLE_CREDENTIALS[index].credential
+    );
+    return JSON.stringify(selectedCredentials, null, 2);
+  }, []);
 
   // Update query when selection changes
   useEffect(() => {
-    const newQuery = generateCombinedQuery(selectedQueryIndices, credentialSets)
-    setQuery(newQuery)
-  }, [selectedQueryIndices, credentialSets, generateCombinedQuery])
+    const newQuery = generateCombinedQuery(
+      selectedQueryIndices,
+      credentialSets
+    );
+    setQuery(newQuery);
+  }, [selectedQueryIndices, credentialSets, generateCombinedQuery]);
 
   // Update credentials when selection changes
   useEffect(() => {
-    const newCredentials = generateCombinedCredentials(selectedCredentialIndices)
-    setCreds(newCredentials)
-  }, [selectedCredentialIndices, generateCombinedCredentials])
+    const newCredentials = generateCombinedCredentials(
+      selectedCredentialIndices
+    );
+    setCreds(newCredentials);
+  }, [selectedCredentialIndices, generateCombinedCredentials]);
 
   /* --------------------  DCQL evaluation ------------------------- */
   const runQuery = useCallback(() => {
     try {
-      const qObj = JSON.parse(query)
-      const cArr = JSON.parse(creds)
-      if (!Array.isArray(cArr)) throw new Error("Credentials must be an array")
-      const parsed = DcqlQuery.parse(qObj)
-      DcqlQuery.validate(parsed)
-      const {credentials, ...res} = DcqlQuery.query(parsed, cArr)
-      setResult(JSON.stringify(res, null, 2))
-      setResultData(res)
-      setError(null)
+      const qObj = JSON.parse(query);
+      const cArr = JSON.parse(creds);
+      if (!Array.isArray(cArr)) throw new Error("Credentials must be an array");
+      const parsed = DcqlQuery.parse(qObj);
+      DcqlQuery.validate(parsed);
+      const { credentials, ...res } = DcqlQuery.query(parsed, cArr);
+      setResult(JSON.stringify(res, null, 2));
+      setResultData(res);
+      setError(null);
     } catch (e) {
-      setError((e as Error).message)
-      setResult("[]")
-      setResultData(null)
+      setError((e as Error).message);
+      setResult("[]");
+      setResultData(null);
     }
-  }, [query, creds])
+  }, [query, creds]);
 
-  const debouncedRun = useDebounce(runQuery, 600)
+  const debouncedRun = useDebounce(runQuery, 600);
 
   /* run on first mount */
-  useEffect(() => runQuery(), [runQuery])
+  useEffect(() => runQuery(), [runQuery]);
 
   /* run when text changes */
-  useEffect(() => debouncedRun(), [query, creds, debouncedRun])
+  useEffect(() => debouncedRun(), [query, creds, debouncedRun]);
 
   // Handle query selection changes
   const handleQuerySelectionChange = (index: number) => {
     setSelectedQueryIndices((prev) => {
       if (prev.includes(index)) {
-        return prev.filter((i) => i !== index)
+        return prev.filter((i) => i !== index);
       } else {
-        return [...prev, index].sort()
+        return [...prev, index].sort();
       }
-    })
-  }
+    });
+  };
 
   // Handle credential selection changes
   const handleCredentialSelectionChange = (index: number) => {
     setSelectedCredentialIndices((prev) => {
       if (prev.includes(index)) {
-        return prev.filter((i) => i !== index)
+        return prev.filter((i) => i !== index);
       } else {
-        return [...prev, index].sort()
+        return [...prev, index].sort();
       }
-    })
-  }
+    });
+  };
 
   const resetQueryToDefault = () => {
-    setSelectedQueryIndices([0])
-    setCredentialSets([])
-  }
+    setSelectedQueryIndices([0]);
+    setCredentialSets([]);
+  };
 
   const resetCredentialsToDefault = () => {
-    setSelectedCredentialIndices([0, 1, 2, 3])
-  }
-
+    setSelectedCredentialIndices([0, 1, 2, 3]);
+  };
 
   /* --------------------  RENDER ---------------------------------- */
   return (
@@ -1181,26 +1538,62 @@ export function DCQLPlayground() {
               src="/logo.svg"
             />
             <div className="flex w-full justify-between">
-              <span className="text-xs text-muted-foreground font-medium">D</span>
-              <span className="text-xs text-muted-foreground font-medium">C</span>
-              <span className="text-xs text-muted-foreground font-medium">Q</span>
-              <span className="text-xs text-muted-foreground font-medium">L</span>
-              <span className="text-xs text-muted-foreground font-medium"> </span>
-              <span className="text-xs text-muted-foreground font-medium"> </span>
-              <span className="text-xs text-muted-foreground font-medium"> </span>
-              <span className="text-xs text-muted-foreground font-medium">P</span>
-              <span className="text-xs text-muted-foreground font-medium">L</span>
-              <span className="text-xs text-muted-foreground font-medium">A</span>
-              <span className="text-xs text-muted-foreground font-medium">Y</span>
-              <span className="text-xs text-muted-foreground font-medium">G</span>
-              <span className="text-xs text-muted-foreground font-medium">R</span>
-              <span className="text-xs text-muted-foreground font-medium">O</span>
-              <span className="text-xs text-muted-foreground font-medium">U</span>
-              <span className="text-xs text-muted-foreground font-medium">N</span>
-              <span className="text-xs text-muted-foreground font-medium">D</span>
+              <span className="text-xs text-muted-foreground font-medium">
+                D
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                C
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                Q
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                L
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                {" "}
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                {" "}
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                {" "}
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                P
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                L
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                A
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                Y
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                G
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                R
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                O
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                U
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                N
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                D
+              </span>
             </div>
           </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">DCQL v0.4.0</span>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+            DCQL v1.0.0
+          </span>
         </div>
         {mounted && (
           <Button
@@ -1209,7 +1602,11 @@ export function DCQLPlayground() {
             className="h-8 w-8 p-0"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
           </Button>
         )}
       </header>
@@ -1218,8 +1615,11 @@ export function DCQLPlayground() {
       <section className="border-b bg-muted/30 px-4 py-3">
         <div className="flex flex-col gap-2 text-sm text-muted-foreground">
           <p className="max-w-4xl">
-            <strong className="text-foreground">DCQL (Digital Credentials Query Language)</strong> is a query language
-            for requesting specific claims from digital credentials. Test your DCQL queries against various credential
+            <strong className="text-foreground">
+              DCQL (Digital Credentials Query Language)
+            </strong>{" "}
+            is a query language for requesting specific claims from digital
+            credentials. Test your DCQL queries against various credential
             formats including mDOC, SD-JWT VC, and W3C VC.
           </p>
           <div className="flex flex-col gap-1 text-xs lg:flex-row lg:items-center lg:justify-between">
@@ -1264,7 +1664,12 @@ export function DCQLPlayground() {
                     onCredentialSetsChange={setCredentialSets}
                     availableCredentialIds={availableCredentialIds}
                   />
-                  <Button variant="ghost" size="sm" className="h-6 px-2" onClick={resetQueryToDefault}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2"
+                    onClick={resetQueryToDefault}
+                  >
                     Reset
                   </Button>
                 </div>
@@ -1272,7 +1677,10 @@ export function DCQLPlayground() {
 
               {/* Query multi-select */}
               <div className="px-3 py-2 border-b">
-                <Popover open={queryPopoverOpen} onOpenChange={setQueryPopoverOpen}>
+                <Popover
+                  open={queryPopoverOpen}
+                  onOpenChange={setQueryPopoverOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -1282,10 +1690,16 @@ export function DCQLPlayground() {
                     >
                       <div className="flex flex-wrap gap-1">
                         {selectedQueryIndices.length === 0 ? (
-                          <span className="text-muted-foreground">Select queries...</span>
+                          <span className="text-muted-foreground">
+                            Select queries...
+                          </span>
                         ) : (
                           selectedQueryIndices.map((index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
+                            <Badge
+                              key={index}
+                              variant="outline"
+                              className="text-xs"
+                            >
                               {SAMPLE_QUERIES[index].name}
                             </Badge>
                           ))
@@ -1296,7 +1710,10 @@ export function DCQLPlayground() {
                   </PopoverTrigger>
                   <PopoverContent className="w-full p-0">
                     <Command>
-                      <CommandInput placeholder="Search queries..." className="h-9" />
+                      <CommandInput
+                        placeholder="Search queries..."
+                        className="h-9"
+                      />
                       <CommandList>
                         <CommandEmpty>No queries found.</CommandEmpty>
                         <CommandGroup>
@@ -1307,7 +1724,11 @@ export function DCQLPlayground() {
                               onSelect={() => handleQuerySelectionChange(index)}
                             >
                               <Check
-                                className={`mr-2 h-4 w-4 ${selectedQueryIndices.includes(index) ? "opacity-100" : "opacity-0"}`}
+                                className={`mr-2 h-4 w-4 ${
+                                  selectedQueryIndices.includes(index)
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                }`}
                               />
                               <span className="text-xs">{sample.name}</span>
                             </CommandItem>
@@ -1341,14 +1762,22 @@ export function DCQLPlayground() {
             <div className="flex min-h-0 flex-col overflow-hidden rounded-md border bg-card">
               <header className="flex items-center justify-between border-b px-3 py-2">
                 <h2 className="text-sm font-medium">Credentials Array</h2>
-                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={resetCredentialsToDefault}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={resetCredentialsToDefault}
+                >
                   Reset
                 </Button>
               </header>
 
               {/* Credentials multi-select */}
               <div className="px-3 py-2 border-b">
-                <Popover open={credentialPopoverOpen} onOpenChange={setCredentialPopoverOpen}>
+                <Popover
+                  open={credentialPopoverOpen}
+                  onOpenChange={setCredentialPopoverOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -1358,10 +1787,16 @@ export function DCQLPlayground() {
                     >
                       <div className="flex flex-wrap gap-1">
                         {selectedCredentialIndices.length === 0 ? (
-                          <span className="text-muted-foreground">Select credentials...</span>
+                          <span className="text-muted-foreground">
+                            Select credentials...
+                          </span>
                         ) : (
                           selectedCredentialIndices.map((index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
+                            <Badge
+                              key={index}
+                              variant="outline"
+                              className="text-xs"
+                            >
                               {SAMPLE_CREDENTIALS[index].name}
                             </Badge>
                           ))
@@ -1372,7 +1807,10 @@ export function DCQLPlayground() {
                   </PopoverTrigger>
                   <PopoverContent className="w-full p-0">
                     <Command>
-                      <CommandInput placeholder="Search credentials..." className="h-9" />
+                      <CommandInput
+                        placeholder="Search credentials..."
+                        className="h-9"
+                      />
                       <CommandList>
                         <CommandEmpty>No credentials found.</CommandEmpty>
                         <CommandGroup>
@@ -1380,10 +1818,16 @@ export function DCQLPlayground() {
                             <CommandItem
                               key={index}
                               value={sample.name}
-                              onSelect={() => handleCredentialSelectionChange(index)}
+                              onSelect={() =>
+                                handleCredentialSelectionChange(index)
+                              }
                             >
                               <Check
-                                className={`mr-2 h-4 w-4 ${selectedCredentialIndices.includes(index) ? "opacity-100" : "opacity-0"}`}
+                                className={`mr-2 h-4 w-4 ${
+                                  selectedCredentialIndices.includes(index)
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                }`}
                               />
                               <span className="text-xs">{sample.name}</span>
                             </CommandItem>
@@ -1443,9 +1887,14 @@ export function DCQLPlayground() {
               </header>
 
               {error && (
-                <Alert variant="destructive" className="mx-3 my-2 flex items-start text-xs">
+                <Alert
+                  variant="destructive"
+                  className="mx-3 my-2 flex items-start text-xs"
+                >
                   <AlertCircle className="mr-1 h-3 w-3" />
-                  <AlertDescription className="break-all">{error}</AlertDescription>
+                  <AlertDescription className="break-all">
+                    {error}
+                  </AlertDescription>
                 </Alert>
               )}
 
@@ -1474,18 +1923,18 @@ export function DCQLPlayground() {
         </section>
       </main>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
 /*  Re-usable card-with-editor component                              */
 /* ------------------------------------------------------------------ */
 interface CardProps {
-  title: string
-  value: string
-  onReset: () => void
-  onChange: (v: string) => void
-  theme: string | undefined
+  title: string;
+  value: string;
+  onReset: () => void;
+  onChange: (v: string) => void;
+  theme: string | undefined;
 }
 
 function CardWithEditor({ title, value, onReset, onChange, theme }: CardProps) {
@@ -1493,7 +1942,12 @@ function CardWithEditor({ title, value, onReset, onChange, theme }: CardProps) {
     <div className="flex min-h-0 flex-col overflow-hidden rounded-md border bg-card">
       <header className="flex items-center justify-between border-b px-3 py-2">
         <h2 className="text-sm font-medium">{title}</h2>
-        <Button variant="ghost" size="sm" className="h-6 px-2" onClick={onReset}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2"
+          onClick={onReset}
+        >
           Reset
         </Button>
       </header>
@@ -1515,5 +1969,5 @@ function CardWithEditor({ title, value, onReset, onChange, theme }: CardProps) {
         />
       </div>
     </div>
-  )
+  );
 }
